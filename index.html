@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Habit Tracker — متتبع العادات</title>
+<meta name="description" content="تطبيق متتبع العادات - تابع عاداتك الشهرية واليومية وعادات الإقلاع">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ═══════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+[data-theme="light"] {
+  --bg: #f0ede6;
+  --surface: #ffffff;
+  --surface-2: #f7f6f3;
+  --text: #1a1a1a;
+  --text-muted: #666;
+  --border: #e0e0e0;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+[data-theme="dark"] {
+  --bg: #0f0f0f;
+  --surface: #1c1c1c;
+  --surface-2: #242424;
+  --text: #f0ede6;
+  --text-muted: #888;
+  --border: #333;
+  --shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg, #f0ede6);
+  color: var(--text, #1a1a1a);
+  direction: rtl;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+button { cursor: pointer; font-family: inherit; }
+input { font-family: inherit; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
+
+/* ═══════════════════════════════════
+   HEADER
+   ═══════════════════════════════════ */
+.app-header {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.app-header h1 {
+  font-size: 1.3rem;
+  letter-spacing: 2px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e8d5b7, #c4a87a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.2); }
+.view-toggle {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.view-toggle button {
+  background: rgba(255,255,255,0.05);
+  border: none;
+  color: rgba(255,255,255,0.6);
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+.view-toggle button.active {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-weight: 600;
+}
+.header-date {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
+  margin: 0 8px;
+}
+.today-btn {
+  background: linear-gradient(135deg, #c4a87a, #a8885a);
+  border: none;
+  color: #1a1a1a;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.today-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+.lang-btn {
+  background: rgba(196,168,122,0.2);
+  border: 1px solid rgba(196,168,122,0.4);
+  color: #c4a87a;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .summary-card,
+[data-theme="dark"] .chart-panel,
+[data-theme="dark"] .analysis-card,
+[data-theme="dark"] .habit-section {
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+[data-theme="dark"] .card-label,
+[data-theme="dark"] .chart-panel h3,
+[data-theme="dark"] .analysis-table th,
+[data-theme="dark"] .habit-table thead th {
+  color: var(--text-muted);
+}
+[data-theme="dark"] .card-count,
+[data-theme="dark"] .analysis-table th,
+[data-theme="dark"] .habit-table thead th,
+[data-theme="dark"] .add-form,
+[data-theme="dark"] .year-month-cell {
+  background: var(--surface-2);
+}
+[data-theme="dark"] .habit-table tbody td,
+[data-theme="dark"] .analysis-table td {
+  border-color: var(--border);
+}
+[data-theme="dark"] .habit-table tbody tr:hover,
+[data-theme="dark"] .add-habit-btn:hover,
+[data-theme="dark"] .habit-name:hover {
+  background: var(--surface-2);
+}
+[data-theme="dark"] input {
+  background: #151515;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ═══════════════════════════════════
+   MAIN LAYOUT
+   ═══════════════════════════════════ */
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ═══════════════════════════════════
+   SUMMARY CARDS
+   ═══════════════════════════════════ */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.summary-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+}
+.summary-card.quit::before { background: linear-gradient(90deg, #7a2020, #a33030); }
+.summary-card.daily::before { background: linear-gradient(90deg, #2d5a27, #4a7c42); }
+.summary-card.monthly::before { background: linear-gradient(90deg, #6b3a3a, #8b5e5e); }
+.card-icon {
+  font-size: 2rem;
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  opacity: 0.15;
+  font-size: 3rem;
+}
+[lang="ar"] .card-icon {
+  left: 16px;
+  right: auto;
+}
+[lang="en"] .card-icon {
+  left: auto;
+  right: 16px;
+}
+[lang="ar"] .summary-card {
+  text-align: right;
+}
+[lang="en"] .summary-card {
+  text-align: left;
+}
+.card-percentage {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.quit .card-percentage { color: #a33030; }
+.daily .card-percentage { color: #4a7c42; }
+.monthly .card-percentage { color: #8b5e5e; }
+.card-label {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.card-count {
+  font-size: 0.8rem;
+  color: #999;
+  background: #f7f6f3;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ═══════════════════════════════════
+   CHARTS
+   ═══════════════════════════════════ */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.chart-panel {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.chart-panel h3 {
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  color: #444;
+  font-weight: 600;
+}
+.chart-panel canvas {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+/* ═══════════════════════════════════
+   MAIN GRID (Sidebar + Content)
+   ═══════════════════════════════════ */
+.main-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+}
+
+/* ═══════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════ */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.analysis-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+.analysis-header {
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+.analysis-header:hover { opacity: 0.9; }
+.analysis-header.monthly-h { background: #1a1a1a; }
+.analysis-header.daily-h { background: #2d5a27; }
+.analysis-header.quit-h { background: #7a2020; }
+.analysis-header.top-h { background: #1a1a1a; }
+.analysis-header .arrow {
+  transition: transform 0.3s;
+  font-size: 0.7rem;
+}
+.analysis-header .arrow.collapsed { transform: rotate(-90deg); }
+.analysis-body {
+  max-height: 400px;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+.analysis-body.collapsed { max-height: 0; }
+.analysis-table {
+  width: 100%;
+  font-size: 0.72rem;
+  border-collapse: collapse;
+}
+.analysis-table th {
+  background: #f7f6f3;
+  padding: 6px 8px;
+  text-align: right;
+  font-weight: 600;
+  color: #666;
+  border-bottom: 1px solid #eee;
+}
+.analysis-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: right;
+}
+.analysis-table tr:last-child td { border-bottom: none; }
+.mini-progress {
+  width: 50px;
+  height: 5px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+.mini-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.top-habit {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.top-habit:last-child { border-bottom: none; }
+.medal { font-size: 1.2rem; }
+.top-habit-name {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.top-habit-pct {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a7c42;
+}
+
+/* ═══════════════════════════════════
+   HABIT SECTIONS
+   ═══════════════════════════════════ */
+.content-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.habit-section {
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.section-header {
+  padding: 12px 18px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.section-header.monthly-sec { background: #1a1a1a; }
+.section-header.daily-sec { background: #2d5a27; }
+.section-header.quit-sec { background: #7a2020; }
+.section-legend {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.85;
+  display: flex;
+  gap: 12px;
+}
+.habit-table-wrapper {
+  overflow-x: auto;
+}
+.habit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.habit-table thead th {
+  background: #f7f6f3;
+  padding: 8px 12px;
+  text-align: right;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #eee;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+.habit-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+.habit-table tbody tr:hover { background: #faf9f6; }
+.habit-table tbody tr:hover .delete-btn { opacity: 1; }
+.habit-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+}
+.habit-name {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.habit-name:hover { background: #f0ede6; }
+.habit-name-input {
+  border: 1px solid #ddd;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  width: 120px;
+  outline: none;
+}
+.habit-name-input:focus { border-color: #4a7c42; box-shadow: 0 0 0 2px rgba(74,124,66,0.15); }
+.delete-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 1rem;
+  transition: all 0.15s;
+  padding: 2px;
+  line-height: 1;
+}
+.delete-btn:hover { color: #a33030; }
+.target-input {
+  width: 50px;
+  border: 1px solid #ddd;
+  padding: 4px 6px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.target-input:focus { border-color: #8b5e5e; }
+.progress-cell {
+  min-width: 100px;
+}
+.progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  min-width: 0;
+}
+.progress-bar-fill.monthly-fill { background: linear-gradient(90deg, #6b3a3a, #8b5e5e); }
+.progress-bar-fill.daily-fill { background: linear-gradient(90deg, #2d5a27, #4a7c42); }
+.progress-bar-fill.quit-fill { background: linear-gradient(90deg, #7a2020, #a33030); }
+.pct-cell {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.monthly-pct { color: #8b5e5e; }
+.daily-pct { color: #4a7c42; }
+.quit-pct { color: #a33030; }
+
+/* Day cells */
+.day-cells {
+  display: flex;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+.day-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background: #faf9f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  position: relative;
+  flex-shrink: 0;
+}
+.day-cell:hover {
+  border-color: #aaa;
+  transform: scale(1.15);
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.day-cell.done {
+  background: #4a7c42;
+  border-color: #2d5a27;
+  color: #fff;
+}
+.day-cell.held {
+  background: #4a7c42;
+  border-color: #2d5a27;
+  color: #fff;
+}
+.day-cell.relapsed {
+  background: #a33030;
+  border-color: #7a2020;
+  color: #fff;
+}
+.day-cell.future {
+  opacity: 0.4;
+  cursor: default;
+}
+.day-cell .day-num {
+  font-size: 0.6rem;
+  line-height: 1;
+}
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: linear-gradient(135deg, #ff6b35, #f7c948);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Add habit */
+.add-habit-btn {
+  width: 100%;
+  padding: 12px;
+  border: 2px dashed #ddd;
+  background: transparent;
+  color: #999;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 0 0 14px 14px;
+  transition: all 0.2s;
+}
+.add-habit-btn:hover {
+  border-color: #bbb;
+  color: #666;
+  background: #faf9f6;
+}
+.add-form {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+  background: #faf9f6;
+  border-top: 1px solid #eee;
+}
+.add-form.open { max-height: 200px; }
+.add-form-inner {
+  padding: 14px 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.add-form-inner input {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.add-form-inner input:focus { border-color: #4a7c42; }
+.add-form-inner input[type="text"] { flex: 1; min-width: 140px; }
+.add-form-inner input[type="number"] { width: 70px; }
+.add-form-inner input[type="date"] { width: 140px; }
+.form-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.form-btn.save { background: #4a7c42; color: #fff; }
+.form-btn.save:hover { background: #2d5a27; }
+.form-btn.cancel { background: #eee; color: #666; }
+.form-btn.cancel:hover { background: #ddd; }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #bbb;
+  font-size: 1rem;
+}
+.empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 10px; display: block; }
+
+/* Year view */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+.year-month-cell {
+  background: #faf9f6;
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+.year-month-cell:hover { border-color: #ddd; transform: translateY(-2px); }
+.year-month-cell.current { border-color: #4a7c42; background: #f0f7ef; }
+.year-month-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; }
+.year-month-pct { font-size: 1.8rem; font-weight: 800; color: #4a7c42; }
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.tooltip.show { opacity: 1; }
+
+/* ═══════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════ */
+@media (max-width: 900px) {
+  .summary-cards { grid-template-columns: 1fr; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .main-grid { grid-template-columns: 1fr; }
+  .sidebar { order: 2; }
+  .content-area { order: 1; }
+  .year-grid { grid-template-columns: repeat(3, 1fr); }
+  .app-header { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 600px) {
+  html { font-size: 12px; }
+  .year-grid { grid-template-columns: repeat(2, 1fr); }
+  .summary-card { padding: 14px; }
+  .card-percentage { font-size: 2rem; }
+  .day-cell { width: 18px; height: 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header" id="appHeader">
+  <h1>HABIT TRACKER</h1>
+  <div class="header-controls">
+    <button class="nav-btn" onclick="window.location.href='profile.html'" title="الحساب / Profile" data-title-ar="الحساب" data-title-en="Profile">👤</button>
+    <button id="langToggle" class="lang-btn" onclick="toggleLanguage()">EN English</button>
+    <button id="themeIcon" class="nav-btn" onclick="toggleTheme()" title="Theme">🌙</button>
+    <span class="header-date" id="headerDate"></span>
+    <div class="view-toggle">
+      <button id="btnMonthView" class="active" onclick="setViewMode('month')" data-ar="شهر" data-en="MONTH">شهر</button>
+      <button id="btnYearView" onclick="setViewMode('year')" data-ar="سنة" data-en="YEAR">سنة</button>
+    </div>
+    <button class="nav-btn" onclick="navigatePrev()" title="السابق" data-title-ar="السابق" data-title-en="Previous">◀</button>
+    <button class="nav-btn" onclick="navigateNext()" title="التالي" data-title-ar="التالي" data-title-en="Next">▶</button>
+    <button class="today-btn" onclick="goToday()" data-ar="اليوم" data-en="Today">اليوم</button>
+  </div>
+</header>
+
+<div class="app-container" id="appContainer">
+  <!-- SUMMARY CARDS -->
+  <div class="summary-cards">
+    <div class="summary-card quit">
+      <span class="card-icon">🚫</span>
+      <div class="card-percentage" id="quitPct">0%</div>
+      <div class="card-label" data-ar="صامد" data-en="Holding Strong">صامد</div>
+      <div class="card-count" id="quitCount">0 / 0</div>
+    </div>
+    <div class="summary-card daily">
+      <span class="card-icon">🔒</span>
+      <div class="card-percentage" id="dailyPct">0%</div>
+      <div class="card-label" data-ar="مكتمل اليوم" data-en="Done Today">مكتمل اليوم</div>
+      <div class="card-count" id="dailyCount">0 / 0</div>
+    </div>
+    <div class="summary-card monthly">
+      <span class="card-icon">📅</span>
+      <div class="card-percentage" id="monthlyPct">0%</div>
+      <div class="card-label" data-ar="تقدم شهري" data-en="Monthly Progress">تقدم شهري</div>
+      <div class="card-count" id="monthlyCount">0 / 0</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <div class="chart-panel">
+      <h3 data-ar="📊 التقدم الأسبوعي" data-en="📊 Weekly Progress">📊 التقدم الأسبوعي</h3>
+      <canvas id="weeklyChart" height="200"></canvas>
+    </div>
+    <div class="chart-panel">
+      <h3 data-ar="📈 تقدم اليوم" data-en="📈 Daily Breakdown">📈 تقدم اليوم</h3>
+      <canvas id="dailyChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- YEAR VIEW (hidden by default) -->
+  <div id="yearView" style="display:none;">
+    <div class="habit-section">
+      <div class="section-header monthly-sec" data-ar="عرض السنة 📅" data-en="Year View 📅">عرض السنة 📅</div>
+      <div class="year-grid" id="yearGrid"></div>
+    </div>
+  </div>
+
+  <!-- MONTH VIEW -->
+  <div id="monthView">
+    <div class="main-grid">
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Analysis Monthly -->
+        <div class="analysis-card">
+          <div class="analysis-header monthly-h" onclick="toggleAnalysis(this)">
+            <span data-ar="تحليل — شهري 📅" data-en="Monthly Analysis 📅">تحليل — شهري 📅</span><span class="arrow">▼</span>
+          </div>
+          <div class="analysis-body" id="analysisMonthly">
+            <table class="analysis-table"><thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th data-ar="هدف" data-en="Target">هدف</th><th data-ar="تم" data-en="Done">تم</th><th data-ar="باقي" data-en="Left">باقي</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead><tbody id="anaMonthlyBody"></tbody></table>
+          </div>
+        </div>
+        <!-- Analysis Daily -->
+        <div class="analysis-card">
+          <div class="analysis-header daily-h" onclick="toggleAnalysis(this)">
+            <span data-ar="تحليل — يومي 🔒" data-en="Daily Analysis 🔒">تحليل — يومي 🔒</span><span class="arrow">▼</span>
+          </div>
+          <div class="analysis-body" id="analysisDaily">
+            <table class="analysis-table"><thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th data-ar="هدف" data-en="Target">هدف</th><th data-ar="تم" data-en="Done">تم</th><th data-ar="باقي" data-en="Left">باقي</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead><tbody id="anaDailyBody"></tbody></table>
+          </div>
+        </div>
+        <!-- Analysis Quit -->
+        <div class="analysis-card">
+          <div class="analysis-header quit-h" onclick="toggleAnalysis(this)">
+            <span data-ar="تحليل — إقلاع 🚫" data-en="Quit Analysis 🚫">تحليل — إقلاع 🚫</span><span class="arrow">▼</span>
+          </div>
+          <div class="analysis-body" id="analysisQuit">
+            <table class="analysis-table"><thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th data-ar="أيام" data-en="Days">أيام</th><th data-ar="صمد" data-en="Held">صمد</th><th data-ar="وقع" data-en="Relapsed">وقع</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead><tbody id="anaQuitBody"></tbody></table>
+          </div>
+        </div>
+        <!-- Top Habits -->
+        <div class="analysis-card">
+          <div class="analysis-header top-h" onclick="toggleAnalysis(this)">
+            <span data-ar="الأفضل 🏆" data-en="Top Habits 🏆">الأفضل 🏆</span><span class="arrow">▼</span>
+          </div>
+          <div class="analysis-body" id="topHabitsBody"></div>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="content-area" id="contentArea">
+        <!-- MONTHLY HABITS -->
+        <section class="habit-section" id="monthlySection">
+          <div class="section-header monthly-sec" data-ar="عادات شهرية 📅" data-en="Monthly Habits 📅">عادات شهرية 📅</div>
+          <div class="habit-table-wrapper">
+            <table class="habit-table">
+              <thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th data-ar="هدف" data-en="Target">هدف</th><th data-ar="تم" data-en="Done">تم</th><th data-ar="باقي" data-en="Left">باقي</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead>
+              <tbody id="monthlyBody"></tbody>
+            </table>
+          </div>
+          <div class="add-form" id="addMonthlyForm">
+            <div class="add-form-inner">
+              <input type="text" id="newMonthlyName" placeholder="اسم العادة الشهرية..." data-placeholder-ar="اسم العادة الشهرية..." data-placeholder-en="Monthly habit name...">
+              <input type="number" id="newMonthlyTarget" placeholder="الهدف" data-placeholder-ar="الهدف" data-placeholder-en="Target" min="1" max="31" value="20">
+              <button class="form-btn save" onclick="saveNewHabit('monthly')" data-ar="حفظ" data-en="Save">حفظ</button>
+              <button class="form-btn cancel" onclick="toggleAddForm('monthly')" data-ar="إلغاء" data-en="Cancel">إلغاء</button>
+            </div>
+          </div>
+          <button class="add-habit-btn" onclick="toggleAddForm('monthly')" data-ar="+ إضافة عادة شهرية" data-en="+ Add Monthly Habit">+ إضافة عادة شهرية</button>
+        </section>
+
+        <!-- DAILY HABITS -->
+        <section class="habit-section" id="dailySection">
+          <div class="section-header daily-sec" data-ar="عادات يومية ثابتة 🔒" data-en="Daily Habits 🔒">عادات يومية ثابتة 🔒</div>
+          <div class="habit-table-wrapper">
+            <table class="habit-table">
+              <thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th colspan="31" data-ar="أيام الشهر" data-en="Month Days">أيام الشهر</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead>
+              <tbody id="dailyBody"></tbody>
+            </table>
+          </div>
+          <div class="add-form" id="addDailyForm">
+            <div class="add-form-inner">
+              <input type="text" id="newDailyName" placeholder="اسم العادة اليومية..." data-placeholder-ar="اسم العادة اليومية..." data-placeholder-en="Daily habit name...">
+              <button class="form-btn save" onclick="saveNewHabit('daily')" data-ar="حفظ" data-en="Save">حفظ</button>
+              <button class="form-btn cancel" onclick="toggleAddForm('daily')" data-ar="إلغاء" data-en="Cancel">إلغاء</button>
+            </div>
+          </div>
+          <button class="add-habit-btn" onclick="toggleAddForm('daily')" data-ar="+ إضافة عادة يومية" data-en="+ Add Daily Habit">+ إضافة عادة يومية</button>
+        </section>
+
+        <!-- QUIT HABITS -->
+        <section class="habit-section" id="quitSection">
+          <div class="section-header quit-sec">
+            <span data-ar="عادات الإقلاع 🚫" data-en="Quit Habits 🚫">عادات الإقلاع 🚫</span>
+            <span class="section-legend">
+              <span data-ar="✅ صمد" data-en="✅ Held">✅ صمد</span>
+              <span data-ar="❌ وقع" data-en="❌ Relapsed">❌ وقع</span>
+              <span data-ar="🔥 سلسلة" data-en="🔥 streak">🔥 سلسلة</span>
+            </span>
+          </div>
+          <div class="habit-table-wrapper">
+            <table class="habit-table">
+              <thead><tr><th data-ar="عادة" data-en="Habit">عادة</th><th colspan="31" data-ar="أيام الشهر" data-en="Month Days">أيام الشهر</th><th data-ar="صمد" data-en="Held">صمد</th><th data-ar="وقع" data-en="Relapsed">وقع</th><th>🔥</th><th data-ar="تقدم" data-en="Progress">تقدم</th><th>%</th></tr></thead>
+              <tbody id="quitBody"></tbody>
+            </table>
+          </div>
+          <div class="add-form" id="addQuitForm">
+            <div class="add-form-inner">
+              <input type="text" id="newQuitName" placeholder="العادة التي تقلع عنها..." data-placeholder-ar="العادة التي تقلع عنها..." data-placeholder-en="Habit you are quitting...">
+              <input type="date" id="newQuitStart">
+              <button class="form-btn save" onclick="saveNewHabit('quit')" data-ar="حفظ" data-en="Save">حفظ</button>
+              <button class="form-btn cancel" onclick="toggleAddForm('quit')" data-ar="إلغاء" data-en="Cancel">إلغاء</button>
+            </div>
+          </div>
+          <button class="add-habit-btn" onclick="toggleAddForm('quit')" data-ar="+ إضافة عادة إقلاع" data-en="+ Add Quit Habit">+ إضافة عادة إقلاع</button>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const SUPABASE_URL = "https://kkxunzwxjqljsoehridz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_LJ1P10kpXTEHPcXuECTTpg_0ALzHMDg";
+const { createClient } = supabase;
+const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+(async () => {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) window.location.replace('login.html');
+})();
+
+function applyStoredPreferences() {
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  const themeIcon = document.getElementById('themeIcon');
+  if (themeIcon) themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+  const savedLang = localStorage.getItem('lang') || 'ar';
+  setLanguage(savedLang);
+}
+
+function setLanguage(lang) {
+  localStorage.setItem('lang', lang);
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.body.style.direction = lang === 'ar' ? 'rtl' : 'ltr';
+  document.querySelectorAll('[data-ar]').forEach(el => {
+    el.textContent = el.getAttribute(`data-${lang}`);
+  });
+  document.querySelectorAll('[data-placeholder-ar]').forEach(el => {
+    el.placeholder = el.getAttribute(`data-placeholder-${lang}`);
+  });
+  document.querySelectorAll('[data-title-ar]').forEach(el => {
+    el.title = el.getAttribute(`data-title-${lang}`);
+  });
+  const langToggle = document.getElementById('langToggle');
+  if (langToggle) langToggle.textContent = lang === 'ar' ? 'EN English' : 'AR عربي';
+  document.title = lang === 'ar' ? 'Habit Tracker — متتبع العادات' : 'Habit Tracker';
+  const metaDescription = document.querySelector('meta[name="description"]');
+  if (metaDescription) {
+    metaDescription.content = lang === 'ar'
+      ? 'تطبيق متتبع العادات - تابع عاداتك الشهرية واليومية وعادات الإقلاع'
+      : 'Habit tracker app - track monthly habits, daily habits, and quit habits';
+  }
+  if (typeof renderAll === 'function' && typeof data !== 'undefined') renderAll();
+  else if (typeof updateHeaderDate === 'function') updateHeaderDate();
+}
+
+function toggleLanguage() {
+  const current = localStorage.getItem('lang') || 'ar';
+  setLanguage(current === 'ar' ? 'en' : 'ar');
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  const themeIcon = document.getElementById('themeIcon');
+  if (themeIcon) themeIcon.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+/* ═══════════════════════════════════
+   STATE & PERSISTENCE
+   ═══════════════════════════════════ */
+const STORAGE_KEY = 'habitTrackerData';
+const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const ENGLISH_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const ARABIC_DAYS_SHORT = ['سبت','أحد','إثن','ثلا','أرب','خمي','جمع'];
+const ENGLISH_DAYS_SHORT = ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+const UI_TEXT = {
+  emptyMonthly: { ar: 'أضف أول عادة شهرية!', en: 'Add your first monthly habit!' },
+  emptyDaily: { ar: 'أضف أول عادة يومية!', en: 'Add your first daily habit!' },
+  emptyQuit: { ar: 'أضف أول عادة إقلاع!', en: 'Add your first quit habit!' },
+  delete: { ar: 'حذف', en: 'Delete' },
+  day: { ar: 'يوم', en: 'Day' },
+  held: { ar: 'صمد', en: 'Held' },
+  relapsed: { ar: 'وقع', en: 'Relapsed' },
+  dayStreak: { ar: 'يوم متتالي!', en: 'day streak!' },
+  dailyDone: { ar: 'يومي مكتمل', en: 'Daily done' },
+  dailyLeft: { ar: 'يومي متبقي', en: 'Daily left' },
+  quitHeld: { ar: 'إقلاع صامد', en: 'Quit held' },
+  quitRelapsed: { ar: 'إقلاع وقع', en: 'Quit relapsed' },
+  quitUnmarked: { ar: 'إقلاع غير مسجل', en: 'Quit unmarked' },
+  noDataToday: { ar: 'لا توجد بيانات اليوم', en: 'No data today' },
+  completed: { ar: 'مكتمل', en: 'Done' },
+  noHabitsYet: { ar: 'لا توجد عادات بعد', en: 'No habits yet' }
+};
+const today = new Date();
+
+let data = loadData();
+
+function currentLang() {
+  return document.documentElement.getAttribute('lang') || localStorage.getItem('lang') || 'ar';
+}
+
+function tr(key) {
+  return UI_TEXT[key][currentLang()] || UI_TEXT[key].ar;
+}
+
+function defaultData() {
+  return {
+    version: 1,
+    monthlyHabits: [],
+    dailyHabits: [],
+    quitHabits: [],
+    settings: {
+      viewMode: 'month',
+      currentYear: today.getFullYear(),
+      currentMonth: today.getMonth() + 1
+    }
+  };
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.version) return parsed;
+    }
+  } catch(e) {}
+  return defaultData();
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getMonthKey(y, m) {
+  return `${y}-${String(m).padStart(2,'0')}`;
+}
+
+function getDayKey(y, m, d) {
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function daysInMonth(y, m) {
+  return new Date(y, m, 0).getDate();
+}
+
+function getTodayKey() {
+  const t = new Date();
+  return getDayKey(t.getFullYear(), t.getMonth()+1, t.getDate());
+}
+
+/* ═══════════════════════════════════
+   NAVIGATION & VIEW
+   ═══════════════════════════════════ */
+function setViewMode(mode) {
+  data.settings.viewMode = mode;
+  saveData();
+  document.getElementById('btnMonthView').classList.toggle('active', mode === 'month');
+  document.getElementById('btnYearView').classList.toggle('active', mode === 'year');
+  document.getElementById('monthView').style.display = mode === 'month' ? '' : 'none';
+  document.getElementById('yearView').style.display = mode === 'year' ? '' : 'none';
+  renderAll();
+}
+
+function navigatePrev() {
+  if (data.settings.viewMode === 'year') {
+    data.settings.currentYear--;
+  } else {
+    data.settings.currentMonth--;
+    if (data.settings.currentMonth < 1) {
+      data.settings.currentMonth = 12;
+      data.settings.currentYear--;
+    }
+  }
+  saveData();
+  renderAll();
+}
+
+function navigateNext() {
+  if (data.settings.viewMode === 'year') {
+    data.settings.currentYear++;
+  } else {
+    data.settings.currentMonth++;
+    if (data.settings.currentMonth > 12) {
+      data.settings.currentMonth = 1;
+      data.settings.currentYear++;
+    }
+  }
+  saveData();
+  renderAll();
+}
+
+function goToday() {
+  const t = new Date();
+  data.settings.currentYear = t.getFullYear();
+  data.settings.currentMonth = t.getMonth() + 1;
+  data.settings.viewMode = 'month';
+  saveData();
+  setViewMode('month');
+}
+
+function updateHeaderDate() {
+  const y = data.settings.currentYear;
+  const m = data.settings.currentMonth;
+  const lang = document.documentElement.getAttribute('lang') || localStorage.getItem('lang') || 'ar';
+  const months = lang === 'ar' ? ARABIC_MONTHS : ENGLISH_MONTHS;
+  document.getElementById('headerDate').textContent =
+    data.settings.viewMode === 'year' ? `${y}` : `${months[m-1]} ${y}`;
+}
+
+/* ═══════════════════════════════════
+   HABIT CRUD
+   ═══════════════════════════════════ */
+function toggleAddForm(type) {
+  const form = document.getElementById(`add${capitalize(type)}Form`);
+  form.classList.toggle('open');
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function saveNewHabit(type) {
+  if (type === 'monthly') {
+    const name = document.getElementById('newMonthlyName').value.trim();
+    const target = parseInt(document.getElementById('newMonthlyTarget').value) || 20;
+    if (!name) return;
+    data.monthlyHabits.push({ id: genId(), name, targetDays: target, completions: {} });
+    document.getElementById('newMonthlyName').value = '';
+    document.getElementById('newMonthlyTarget').value = '20';
+  } else if (type === 'daily') {
+    const name = document.getElementById('newDailyName').value.trim();
+    if (!name) return;
+    data.dailyHabits.push({ id: genId(), name, completions: {} });
+    document.getElementById('newDailyName').value = '';
+  } else if (type === 'quit') {
+    const name = document.getElementById('newQuitName').value.trim();
+    const startDate = document.getElementById('newQuitStart').value || getTodayKey();
+    if (!name) return;
+    data.quitHabits.push({ id: genId(), name, startDate, days: {} });
+    document.getElementById('newQuitName').value = '';
+  }
+  toggleAddForm(type);
+  saveData();
+  renderAll();
+}
+
+function deleteHabit(type, id) {
+  if (type === 'monthly') data.monthlyHabits = data.monthlyHabits.filter(h => h.id !== id);
+  else if (type === 'daily') data.dailyHabits = data.dailyHabits.filter(h => h.id !== id);
+  else if (type === 'quit') data.quitHabits = data.quitHabits.filter(h => h.id !== id);
+  saveData();
+  renderAll();
+}
+
+function startEditName(el, type, id) {
+  const current = el.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'habit-name-input';
+  input.value = current;
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const finish = () => {
+    const newName = input.value.trim() || current;
+    let list;
+    if (type === 'monthly') list = data.monthlyHabits;
+    else if (type === 'daily') list = data.dailyHabits;
+    else list = data.quitHabits;
+    const habit = list.find(h => h.id === id);
+    if (habit) habit.name = newName;
+    saveData();
+    renderAll();
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = current; input.blur(); }
+  });
+}
+
+/* ═══════════════════════════════════
+   MONTHLY HABITS
+   ═══════════════════════════════════ */
+function renderMonthlyHabits() {
+  const tbody = document.getElementById('monthlyBody');
+  const mk = getMonthKey(data.settings.currentYear, data.settings.currentMonth);
+
+  if (data.monthlyHabits.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📅</span>${tr('emptyMonthly')}</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.monthlyHabits.map(h => {
+    const done = h.completions[mk] || 0;
+    const remaining = Math.max(0, h.targetDays - done);
+    const pct = h.targetDays > 0 ? Math.round((done / h.targetDays) * 100) : 0;
+    return `<tr>
+      <td><div class="habit-name-cell">
+        <button class="delete-btn" onclick="deleteHabit('monthly','${h.id}')" title="${tr('delete')}">✕</button>
+        <span class="habit-name" onclick="startEditName(this,'monthly','${h.id}')">${escHtml(h.name)}</span>
+      </div></td>
+      <td><input type="number" class="target-input" value="${h.targetDays}" min="1" max="31"
+        onchange="updateMonthlyTarget('${h.id}', this.value)"></td>
+      <td style="text-align:center">
+        <button class="nav-btn" style="width:24px;height:24px;font-size:0.7rem;background:#f0ede6;color:#1a1a1a;border-color:#ddd"
+          onclick="changeMonthlyDone('${h.id}',-1)">−</button>
+        <strong style="margin:0 6px">${done}</strong>
+        <button class="nav-btn" style="width:24px;height:24px;font-size:0.7rem;background:#f0ede6;color:#1a1a1a;border-color:#ddd"
+          onclick="changeMonthlyDone('${h.id}',1)">+</button>
+      </td>
+      <td style="text-align:center">${remaining}</td>
+      <td class="progress-cell"><div class="progress-bar-wrap"><div class="progress-bar-fill monthly-fill" style="width:${Math.min(pct,100)}%"></div></div></td>
+      <td class="pct-cell monthly-pct">${pct}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateMonthlyTarget(id, val) {
+  const h = data.monthlyHabits.find(h => h.id === id);
+  if (h) { h.targetDays = Math.max(1, parseInt(val) || 1); saveData(); renderAll(); }
+}
+
+function changeMonthlyDone(id, delta) {
+  const mk = getMonthKey(data.settings.currentYear, data.settings.currentMonth);
+  const h = data.monthlyHabits.find(h => h.id === id);
+  if (!h) return;
+  if (!h.completions[mk]) h.completions[mk] = 0;
+  h.completions[mk] = Math.max(0, Math.min(h.targetDays, h.completions[mk] + delta));
+  saveData();
+  renderAll();
+}
+
+/* ═══════════════════════════════════
+   DAILY HABITS
+   ═══════════════════════════════════ */
+function renderDailyHabits() {
+  const tbody = document.getElementById('dailyBody');
+  const y = data.settings.currentYear;
+  const m = data.settings.currentMonth;
+  const dim = daysInMonth(y, m);
+  const todayD = (today.getFullYear() === y && today.getMonth()+1 === m) ? today.getDate() : 0;
+
+  if (data.dailyHabits.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="33"><div class="empty-state"><span class="empty-icon">🔒</span>${tr('emptyDaily')}</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.dailyHabits.map(h => {
+    let doneCount = 0;
+    let cells = '';
+    for (let d = 1; d <= 31; d++) {
+      if (d > dim) {
+        cells += `<div class="day-cell" style="visibility:hidden"><span class="day-num">${d}</span></div>`;
+        continue;
+      }
+      const dk = getDayKey(y, m, d);
+      const isDone = h.completions[dk] === true;
+      if (isDone) doneCount++;
+      const isFuture = (y === today.getFullYear() && m === today.getMonth()+1 && d > today.getDate())
+        || (y === today.getFullYear() && m > today.getMonth()+1)
+        || (y > today.getFullYear());
+      const cls = isDone ? 'done' : '';
+      const futCls = isFuture ? ' future' : '';
+      cells += `<div class="day-cell ${cls}${futCls}" onclick="${isFuture ? '' : `toggleDaily('${h.id}',${d})`}"
+        onmouseenter="showTooltip(event,'${tr('day')} ${d}')" onmouseleave="hideTooltip()">
+        <span class="day-num">${d}</span></div>`;
+    }
+    const maxPossible = todayD > 0 ? todayD : dim;
+    const pct = maxPossible > 0 ? Math.round((doneCount / maxPossible) * 100) : 0;
+    return `<tr>
+      <td><div class="habit-name-cell">
+        <button class="delete-btn" onclick="deleteHabit('daily','${h.id}')" title="${tr('delete')}">✕</button>
+        <span class="habit-name" onclick="startEditName(this,'daily','${h.id}')">${escHtml(h.name)}</span>
+      </div></td>
+      <td colspan="31"><div class="day-cells">${cells}</div></td>
+      <td class="progress-cell"><div class="progress-bar-wrap"><div class="progress-bar-fill daily-fill" style="width:${Math.min(pct,100)}%"></div></div></td>
+      <td class="pct-cell daily-pct">${pct}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleDaily(id, day) {
+  const y = data.settings.currentYear;
+  const m = data.settings.currentMonth;
+  const dk = getDayKey(y, m, day);
+  const h = data.dailyHabits.find(h => h.id === id);
+  if (!h) return;
+  h.completions[dk] = !h.completions[dk];
+  saveData();
+  renderAll();
+}
+
+/* ═══════════════════════════════════
+   QUIT HABITS
+   ═══════════════════════════════════ */
+function renderQuitHabits() {
+  const tbody = document.getElementById('quitBody');
+  const y = data.settings.currentYear;
+  const m = data.settings.currentMonth;
+  const dim = daysInMonth(y, m);
+
+  if (data.quitHabits.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="36"><div class="empty-state"><span class="empty-icon">🚫</span>${tr('emptyQuit')}</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.quitHabits.map(h => {
+    let heldCount = 0, relapsedCount = 0;
+    let cells = '';
+    for (let d = 1; d <= 31; d++) {
+      if (d > dim) {
+        cells += `<div class="day-cell" style="visibility:hidden"><span class="day-num">${d}</span></div>`;
+        continue;
+      }
+      const dk = getDayKey(y, m, d);
+      const status = h.days[dk] || null;
+      if (status === 'held') heldCount++;
+      if (status === 'relapsed') relapsedCount++;
+      const isFuture = (y === today.getFullYear() && m === today.getMonth()+1 && d > today.getDate())
+        || (y === today.getFullYear() && m > today.getMonth()+1)
+        || (y > today.getFullYear());
+      let cls = '';
+      let icon = d;
+      if (status === 'held') { cls = 'held'; icon = '✅'; }
+      else if (status === 'relapsed') { cls = 'relapsed'; icon = '❌'; }
+      const futCls = isFuture ? ' future' : '';
+      cells += `<div class="day-cell ${cls}${futCls}" onclick="${isFuture ? '' : `toggleQuit('${h.id}',${d})`}"
+        onmouseenter="showTooltip(event,'${status === 'held' ? tr('held') + ' ✅' : status === 'relapsed' ? tr('relapsed') + ' ❌' : tr('day') + ' ' + d}')"
+        onmouseleave="hideTooltip()">
+        <span class="day-num">${status ? icon : d}</span></div>`;
+    }
+    const totalDays = heldCount + relapsedCount;
+    const pct = totalDays > 0 ? Math.round((heldCount / totalDays) * 100) : 0;
+    const streak = calcStreak(h);
+
+    return `<tr>
+      <td><div class="habit-name-cell">
+        <button class="delete-btn" onclick="deleteHabit('quit','${h.id}')" title="${tr('delete')}">✕</button>
+        <span class="habit-name" onclick="startEditName(this,'quit','${h.id}')">${escHtml(h.name)}</span>
+      </div></td>
+      <td colspan="31"><div class="day-cells">${cells}</div></td>
+      <td style="text-align:center;color:#4a7c42;font-weight:700">${heldCount}</td>
+      <td style="text-align:center;color:#a33030;font-weight:700">${relapsedCount}</td>
+      <td>${streak > 0 ? `<span class="streak-badge" onmouseenter="showTooltip(event,'🔥 ${streak} ${tr('dayStreak')}')" onmouseleave="hideTooltip()">🔥 ${streak}</span>` : '—'}</td>
+      <td class="progress-cell"><div class="progress-bar-wrap"><div class="progress-bar-fill quit-fill" style="width:${Math.min(pct,100)}%"></div></div></td>
+      <td class="pct-cell quit-pct">${pct}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleQuit(id, day) {
+  const y = data.settings.currentYear;
+  const m = data.settings.currentMonth;
+  const dk = getDayKey(y, m, day);
+  const h = data.quitHabits.find(h => h.id === id);
+  if (!h) return;
+  const current = h.days[dk] || null;
+  if (current === null) h.days[dk] = 'held';
+  else if (current === 'held') h.days[dk] = 'relapsed';
+  else { delete h.days[dk]; }
+  saveData();
+  renderAll();
+}
+
+function calcStreak(habit) {
+  let streak = 0;
+  const t = new Date();
+  const d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  while (true) {
+    const dk = getDayKey(d.getFullYear(), d.getMonth()+1, d.getDate());
+    if (habit.days[dk] === 'held') {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+/* ═══════════════════════════════════
+   SUMMARY CARDS
+   ═══════════════════════════════════ */
+function updateSummaryCards() {
+  const todayKey = getTodayKey();
+  const mk = getMonthKey(data.settings.currentYear, data.settings.currentMonth);
+
+  // Quit
+  let qHolding = 0, qTotal = data.quitHabits.length;
+  data.quitHabits.forEach(h => {
+    if (h.days[todayKey] === 'held' || (!h.days[todayKey] && h.days[todayKey] !== 'relapsed')) {
+      // Count as holding if marked held today, or not yet marked (still holding)
+    }
+    // Actually: count those marked 'held' today or not relapsed today
+    const st = h.days[todayKey];
+    if (st !== 'relapsed') qHolding++;
+  });
+  const qPct = qTotal > 0 ? Math.round((qHolding / qTotal) * 100) : 0;
+
+  // Daily
+  let dDone = 0, dTotal = data.dailyHabits.length;
+  data.dailyHabits.forEach(h => {
+    if (h.completions[todayKey] === true) dDone++;
+  });
+  const dPct = dTotal > 0 ? Math.round((dDone / dTotal) * 100) : 0;
+
+  // Monthly
+  let mDone = 0, mTarget = 0;
+  data.monthlyHabits.forEach(h => {
+    mDone += (h.completions[mk] || 0);
+    mTarget += h.targetDays;
+  });
+  const mPct = mTarget > 0 ? Math.round((mDone / mTarget) * 100) : 0;
+
+  animateCounter('quitPct', qPct);
+  animateCounter('dailyPct', dPct);
+  animateCounter('monthlyPct', mPct);
+  document.getElementById('quitCount').textContent = `${qHolding} / ${qTotal}`;
+  document.getElementById('dailyCount').textContent = `${dDone} / ${dTotal}`;
+  document.getElementById('monthlyCount').textContent = `${mDone} / ${mTarget}`;
+}
+
+function animateCounter(elementId, target) {
+  const el = document.getElementById(elementId);
+  const current = parseInt(el.textContent) || 0;
+  if (current === target) { el.textContent = target + '%'; return; }
+  const step = target > current ? 1 : -1;
+  let val = current;
+  const interval = Math.max(10, 500 / Math.abs(target - current));
+  const timer = setInterval(() => {
+    val += step;
+    el.textContent = val + '%';
+    if (val === target) clearInterval(timer);
+  }, interval);
+}
+
+/* ═══════════════════════════════════
+   CHARTS
+   ═══════════════════════════════════ */
+function renderWeeklyChart() {
+  const canvas = document.getElementById('weeklyChart');
+  const ctx = canvas.getContext('2d');
+  const daysShort = currentLang() === 'ar' ? ARABIC_DAYS_SHORT : ENGLISH_DAYS_SHORT;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 200;
+  ctx.clearRect(0, 0, W, H);
+
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dk = getDayKey(d.getFullYear(), d.getMonth()+1, d.getDate());
+    const dayOfWeek = (d.getDay() + 1) % 7; // Sat=0
+    let total = 0, done = 0;
+
+    data.dailyHabits.forEach(h => {
+      total++;
+      if (h.completions[dk] === true) done++;
+    });
+    data.quitHabits.forEach(h => {
+      total++;
+      if (h.days[dk] === 'held') done++;
+    });
+
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    days.push({ label: daysShort[dayOfWeek], pct, dk });
+  }
+
+  const padL = 35, padR = 10, padT = 15, padB = 25;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const barW = chartW / 7 * 0.6;
+  const gap = chartW / 7;
+
+  // Y axis
+  ctx.strokeStyle = '#eee';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#aaa';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'left';
+  for (let v = 0; v <= 100; v += 25) {
+    const y = padT + chartH - (v / 100) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.fillText(v + '%', 2, y + 3);
+  }
+
+  // Bars
+  days.forEach((day, i) => {
+    const x = padL + i * gap + (gap - barW) / 2;
+    const barH = (day.pct / 100) * chartH;
+    const y = padT + chartH - barH;
+
+    const grad = ctx.createLinearGradient(x, y + barH, x, y);
+    grad.addColorStop(0, '#2d5a27');
+    grad.addColorStop(1, '#6abf5e');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#666';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(day.label, x + barW / 2, H - 6);
+
+    // Value on top
+    if (day.pct > 0) {
+      ctx.fillStyle = '#2d5a27';
+      ctx.font = 'bold 10px system-ui';
+      ctx.fillText(day.pct + '%', x + barW / 2, y - 4);
+    }
+  });
+}
+
+function renderDailyChart() {
+  const canvas = document.getElementById('dailyChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 200;
+  ctx.clearRect(0, 0, W, H);
+
+  const todayKey = getTodayKey();
+  let dailyDone = 0, dailyTotal = data.dailyHabits.length;
+  data.dailyHabits.forEach(h => { if (h.completions[todayKey]) dailyDone++; });
+
+  let quitHeld = 0, quitRelapsed = 0, quitTotal = data.quitHabits.length;
+  data.quitHabits.forEach(h => {
+    if (h.days[todayKey] === 'held') quitHeld++;
+    else if (h.days[todayKey] === 'relapsed') quitRelapsed++;
+  });
+
+  const segments = [
+    { label: tr('dailyDone'), value: dailyDone, color: '#4a7c42' },
+    { label: tr('dailyLeft'), value: dailyTotal - dailyDone, color: '#c8e6c5' },
+    { label: tr('quitHeld'), value: quitHeld, color: '#e88a3a' },
+    { label: tr('quitRelapsed'), value: quitRelapsed, color: '#a33030' },
+    { label: tr('quitUnmarked'), value: Math.max(0, quitTotal - quitHeld - quitRelapsed), color: '#ddd' },
+  ].filter(s => s.value > 0);
+
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) {
+    ctx.fillStyle = '#ccc';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(tr('noDataToday'), W/2, H/2);
+    return;
+  }
+
+  // Donut chart
+  const cx = W / 2, cy = H / 2 - 10;
+  const R = 70, r = 42;
+  let startAngle = -Math.PI / 2;
+
+  segments.forEach(seg => {
+    const sweep = (seg.value / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, startAngle, startAngle + sweep);
+    ctx.arc(cx, cy, r, startAngle + sweep, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+    startAngle += sweep;
+  });
+
+  // Center text
+  const pct = total > 0 ? Math.round(((dailyDone + quitHeld) / total) * 100) : 0;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = 'bold 22px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(pct + '%', cx, cy + 4);
+  ctx.font = '10px system-ui';
+  ctx.fillStyle = '#888';
+  ctx.fillText(tr('completed'), cx, cy + 18);
+
+  // Legend
+  let lx = 10, ly = H - 20;
+  ctx.font = '10px system-ui';
+  segments.forEach((seg, i) => {
+    ctx.fillStyle = seg.color;
+    ctx.fillRect(lx, ly - 8, 10, 10);
+    ctx.fillStyle = '#666';
+    ctx.textAlign = currentLang() === 'ar' ? 'right' : 'left';
+    ctx.fillText(`${seg.label} (${seg.value})`, lx + 14, ly);
+    lx += ctx.measureText(`${seg.label} (${seg.value})`).width + 24;
+    if (lx > W - 40) { lx = 10; ly -= 16; }
+  });
+}
+
+/* ═══════════════════════════════════
+   SIDEBAR ANALYSIS
+   ═══════════════════════════════════ */
+function renderAnalysis() {
+  const mk = getMonthKey(data.settings.currentYear, data.settings.currentMonth);
+  const todayKey = getTodayKey();
+  const y = data.settings.currentYear, m = data.settings.currentMonth;
+  const dim = daysInMonth(y, m);
+  const todayD = (today.getFullYear() === y && today.getMonth()+1 === m) ? today.getDate() : dim;
+
+  // Monthly analysis
+  document.getElementById('anaMonthlyBody').innerHTML = data.monthlyHabits.map(h => {
+    const done = h.completions[mk] || 0;
+    const rem = Math.max(0, h.targetDays - done);
+    const pct = h.targetDays > 0 ? Math.round((done / h.targetDays) * 100) : 0;
+    return `<tr><td>${escHtml(h.name)}</td><td>${h.targetDays}</td><td>${done}</td><td>${rem}</td>
+      <td><div class="mini-progress"><div class="mini-progress-fill" style="width:${Math.min(pct,100)}%;background:#8b5e5e"></div></div></td><td>${pct}%</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:#ccc;padding:12px">${tr('noHabitsYet')}</td></tr>`;
+
+  // Daily analysis
+  document.getElementById('anaDailyBody').innerHTML = data.dailyHabits.map(h => {
+    let done = 0;
+    for (let d = 1; d <= todayD; d++) {
+      if (h.completions[getDayKey(y, m, d)] === true) done++;
+    }
+    const rem = Math.max(0, todayD - done);
+    const pct = todayD > 0 ? Math.round((done / todayD) * 100) : 0;
+    return `<tr><td>${escHtml(h.name)}</td><td>${todayD}</td><td>${done}</td><td>${rem}</td>
+      <td><div class="mini-progress"><div class="mini-progress-fill" style="width:${Math.min(pct,100)}%;background:#4a7c42"></div></div></td><td>${pct}%</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:#ccc;padding:12px">${tr('noHabitsYet')}</td></tr>`;
+
+  // Quit analysis
+  document.getElementById('anaQuitBody').innerHTML = data.quitHabits.map(h => {
+    let held = 0, rel = 0;
+    for (let d = 1; d <= todayD; d++) {
+      const st = h.days[getDayKey(y, m, d)];
+      if (st === 'held') held++;
+      if (st === 'relapsed') rel++;
+    }
+    const totalD = held + rel;
+    const pct = totalD > 0 ? Math.round((held / totalD) * 100) : 0;
+    return `<tr><td>${escHtml(h.name)}</td><td>${totalD}</td><td>${held}</td><td>${rel}</td>
+      <td><div class="mini-progress"><div class="mini-progress-fill" style="width:${Math.min(pct,100)}%;background:#a33030"></div></div></td><td>${pct}%</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:#ccc;padding:12px">${tr('noHabitsYet')}</td></tr>`;
+
+  // Top habits
+  renderTopHabits();
+}
+
+function renderTopHabits() {
+  const mk = getMonthKey(data.settings.currentYear, data.settings.currentMonth);
+  const y = data.settings.currentYear, m = data.settings.currentMonth;
+  const todayD = (today.getFullYear() === y && today.getMonth()+1 === m) ? today.getDate() : daysInMonth(y, m);
+
+  const all = [];
+  data.monthlyHabits.forEach(h => {
+    const done = h.completions[mk] || 0;
+    const pct = h.targetDays > 0 ? Math.round((done / h.targetDays) * 100) : 0;
+    all.push({ name: h.name, pct, type: 'monthly' });
+  });
+  data.dailyHabits.forEach(h => {
+    let done = 0;
+    for (let d = 1; d <= todayD; d++) {
+      if (h.completions[getDayKey(y, m, d)] === true) done++;
+    }
+    const pct = todayD > 0 ? Math.round((done / todayD) * 100) : 0;
+    all.push({ name: h.name, pct, type: 'daily' });
+  });
+  data.quitHabits.forEach(h => {
+    let held = 0, total = 0;
+    for (let d = 1; d <= todayD; d++) {
+      const st = h.days[getDayKey(y, m, d)];
+      if (st === 'held') { held++; total++; }
+      if (st === 'relapsed') total++;
+    }
+    const pct = total > 0 ? Math.round((held / total) * 100) : 0;
+    all.push({ name: h.name, pct, type: 'quit' });
+  });
+
+  all.sort((a, b) => b.pct - a.pct);
+  const top3 = all.slice(0, 3);
+  const medals = ['🥇', '🥈', '🥉'];
+  const colors = { monthly: '#8b5e5e', daily: '#4a7c42', quit: '#a33030' };
+
+  document.getElementById('topHabitsBody').innerHTML = top3.length > 0
+    ? top3.map((h, i) => `<div class="top-habit">
+        <span class="medal">${medals[i]}</span>
+        <span class="top-habit-name">${escHtml(h.name)}</span>
+        <span class="top-habit-pct" style="color:${colors[h.type]}">${h.pct}%</span>
+      </div>`).join('')
+    : `<div style="text-align:center;color:#ccc;padding:16px">${tr('noHabitsYet')}</div>`;
+}
+
+/* ═══════════════════════════════════
+   YEAR VIEW
+   ═══════════════════════════════════ */
+function renderYearView() {
+  const grid = document.getElementById('yearGrid');
+  const y = data.settings.currentYear;
+  const months = currentLang() === 'ar' ? ARABIC_MONTHS : ENGLISH_MONTHS;
+
+  grid.innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    const dim = daysInMonth(y, m);
+    const mk = getMonthKey(y, m);
+    let totalPossible = 0, totalDone = 0;
+
+    data.monthlyHabits.forEach(h => {
+      totalPossible += h.targetDays;
+      totalDone += (h.completions[mk] || 0);
+    });
+    data.dailyHabits.forEach(h => {
+      for (let d = 1; d <= dim; d++) {
+        totalPossible++;
+        if (h.completions[getDayKey(y, m, d)] === true) totalDone++;
+      }
+    });
+    data.quitHabits.forEach(h => {
+      for (let d = 1; d <= dim; d++) {
+        const st = h.days[getDayKey(y, m, d)];
+        if (st === 'held' || st === 'relapsed') totalPossible++;
+        if (st === 'held') totalDone++;
+      }
+    });
+
+    const pct = totalPossible > 0 ? Math.round((totalDone / totalPossible) * 100) : 0;
+    const isCurrent = (y === today.getFullYear() && m === today.getMonth()+1);
+    return `<div class="year-month-cell${isCurrent ? ' current' : ''}" onclick="jumpToMonth(${m})">
+      <div class="year-month-name">${months[i]}</div>
+      <div class="year-month-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+function jumpToMonth(m) {
+  data.settings.currentMonth = m;
+  data.settings.viewMode = 'month';
+  saveData();
+  setViewMode('month');
+}
+
+/* ═══════════════════════════════════
+   SIDEBAR TOGGLE
+   ═══════════════════════════════════ */
+function toggleAnalysis(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.arrow');
+  body.classList.toggle('collapsed');
+  arrow.classList.toggle('collapsed');
+}
+
+/* ═══════════════════════════════════
+   TOOLTIP
+   ═══════════════════════════════════ */
+function showTooltip(event, text) {
+  const tip = document.getElementById('tooltip');
+  tip.textContent = text;
+  tip.classList.add('show');
+  tip.style.left = event.clientX + 10 + 'px';
+  tip.style.top = event.clientY - 30 + 'px';
+}
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('show');
+}
+
+/* ═══════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════ */
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ═══════════════════════════════════
+   RENDER ALL
+   ═══════════════════════════════════ */
+function renderAll() {
+  updateHeaderDate();
+  updateSummaryCards();
+  renderMonthlyHabits();
+  renderDailyHabits();
+  renderQuitHabits();
+  renderAnalysis();
+  renderWeeklyChart();
+  renderDailyChart();
+  if (data.settings.viewMode === 'year') renderYearView();
+}
+
+/* ═══════════════════════════════════
+   INIT
+   ═══════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  applyStoredPreferences();
+
+  // Set default quit start date to today
+  const todayISO = getTodayKey();
+  document.getElementById('newQuitStart').value = todayISO;
+
+  // Set initial view
+  setViewMode(data.settings.viewMode);
+
+  // Redraw charts on resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderWeeklyChart();
+      renderDailyChart();
+    }, 150);
+  });
+});
+</script>
+</body>
+</html>

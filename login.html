@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Habit Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body, .auth-card, .auth-content, .tabs, .form,
+.row, .brand, .field, .password-wrap { direction: ltr; }
+
+[lang="ar"] label, [lang="ar"] input, [lang="ar"] .error,
+[lang="ar"] .tab, [lang="ar"] .remember span,
+[lang="ar"] .link, [lang="ar"] .primary-btn,
+[lang="ar"] .strength-text { direction: rtl; text-align: right; }
+
+[lang="en"] label, [lang="en"] input, [lang="en"] .error,
+[lang="en"] .tab, [lang="en"] .remember span,
+[lang="en"] .link, [lang="en"] .primary-btn,
+[lang="en"] .strength-text { direction: ltr; text-align: left; }
+
+[lang="ar"] .toggle-password { left: 8px; right: auto; }
+[lang="en"] .toggle-password { right: 8px; left: auto; }
+[lang="ar"] .password-wrap input { padding-right: 12px; padding-left: 44px; }
+[lang="en"] .password-wrap input { padding-left: 12px; padding-right: 44px; }
+
+[lang="en"] .toast { left: auto; right: 24px; border-right: 0; border-left: 4px solid; }
+[lang="en"] .toast.success { border-left-color: #4a7c42; }
+[lang="en"] .toast.error   { border-left-color: #a33030; }
+[lang="en"] .toast.info    { border-left-color: #c4a87a; }
+[data-theme="dark"] { --bg:#0f0f0f; --surface:#1c1c1c; --surface-2:#242424; --text:#f0ede6; --text-muted:#888; --border:#333; --shadow:0 2px 12px rgba(0,0,0,0.4); }
+[data-theme="light"] { --bg:#f0ede6; --surface:#ffffff; --surface-2:#f7f6f3; --text:#1a1a1a; --text-muted:#666; --border:#e0e0e0; --shadow:0 2px 12px rgba(0,0,0,0.06); }
+body {
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  line-height: 1.5;
+}
+button, input { font: inherit; }
+button { cursor: pointer; }
+.lang-toggle-fixed {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  background: #1a1a1a;
+  color: #c4a87a;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 700;
+}
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(196,168,122,0.35);
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #c4a87a;
+}
+.auth-card {
+  width: min(100%, 420px);
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+.top-strip { height: 4px; background: linear-gradient(90deg, #c4a87a, #e8d5b7); }
+.auth-content { padding: 32px; }
+.brand { text-align: center; margin-bottom: 24px; }
+.brand-icon { font-size: 2.1rem; display: block; margin-bottom: 8px; }
+.brand-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #e8d5b7, #c4a87a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 8px 12px;
+  font-weight: 700;
+  position: relative;
+}
+.tab.active { color: var(--text); }
+.tab.active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  left: 0;
+  bottom: -1px;
+  height: 3px;
+  background: #c4a87a;
+  border-radius: 3px 3px 0 0;
+}
+.form { display: none; }
+.form.active { display: block; }
+.field { margin-bottom: 16px; }
+label { display: block; font-weight: 700; margin-bottom: 7px; }
+input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus { border-color: #c4a87a; box-shadow: 0 0 0 3px rgba(196,168,122,0.16); }
+.field.invalid input { border-color: #a33030; }
+.error { min-height: 18px; color: #a33030; font-size: 0.78rem; margin-top: 5px; }
+.password-wrap { position: relative; }
+.toggle-password {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+[dir="ltr"] .toggle-password { left: auto; right: 8px; }
+.password-wrap input { padding-left: 44px; }
+[dir="ltr"] .password-wrap input { padding-left: 12px; padding-right: 44px; }
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 20px;
+}
+.remember { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-weight: 600; }
+.remember input { width: 16px; height: 16px; accent-color: #c4a87a; }
+.link { color: #8f7048; text-decoration: none; font-weight: 700; }
+.link:hover { text-decoration: underline; }
+.primary-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #c4a87a, #a8885a);
+  color: #1a1a1a;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.primary-btn:disabled { opacity: 0.75; cursor: wait; }
+.google-btn {
+  width: 100%;
+  height: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.google-btn:hover {
+  background: var(--surface-2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.google-btn:disabled { opacity: 0.7; cursor: wait; }
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(26,26,26,0.25);
+  border-top-color: #1a1a1a;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.strength { height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; margin-top: 8px; }
+.strength-fill { height: 100%; width: 0; transition: width 0.2s, background 0.2s; }
+.strength-text { min-height: 18px; font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  min-width: 280px;
+  max-width: 360px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 9999;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-right: 4px solid #4a7c42; }
+.toast.error { border-right: 4px solid #a33030; }
+.toast.info { border-right: 4px solid #c4a87a; }
+[dir="ltr"] .toast { left: auto; right: 24px; }
+[dir="ltr"] .toast.success, [dir="ltr"] .toast.error, [dir="ltr"] .toast.info { border-right: 0; border-left: 4px solid; }
+[dir="ltr"] .toast.success { border-left-color: #4a7c42; }
+[dir="ltr"] .toast.error { border-left-color: #a33030; }
+[dir="ltr"] .toast.info { border-left-color: #c4a87a; }
+@media (max-width: 480px) {
+  body { padding: 0; }
+  .auth-card { width: 100%; min-height: 100vh; border-radius: 0; box-shadow: none; }
+  .auth-content { padding: 76px 22px 28px; }
+  .lang-toggle-fixed { top: 12px; right: 12px; }
+  .theme-toggle { top: 12px; left: 12px; }
+  .toast { left: 50%; right: auto; transform: translate(-50%, 100px); width: calc(100% - 32px); min-width: 0; }
+  .toast.show { transform: translate(-50%, 0); }
+}
+</style>
+</head>
+<body>
+<button id="langToggle" class="lang-toggle-fixed" onclick="toggleLanguage()">EN English</button>
+<button id="themeIcon" class="theme-toggle" onclick="toggleTheme()" title="Theme">🌙</button>
+
+<main class="auth-card">
+  <div class="top-strip"></div>
+  <div class="auth-content">
+    <header class="brand">
+      <span class="brand-icon">📅</span>
+      <h1 class="brand-title" data-ar="متتبع العادات" data-en="Habit Tracker">متتبع العادات</h1>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button id="signInTab" class="tab active" type="button" onclick="switchTab('signin')" data-ar="تسجيل الدخول" data-en="Sign In">تسجيل الدخول</button>
+      <button id="signUpTab" class="tab" type="button" onclick="switchTab('signup')" data-ar="إنشاء حساب" data-en="Sign Up">إنشاء حساب</button>
+    </div>
+
+    <form id="signInForm" class="form active" novalidate>
+      <div class="field" data-field="signin-email">
+        <label for="signinEmail" data-ar="البريد الإلكتروني" data-en="Email">البريد الإلكتروني</label>
+        <input id="signinEmail" type="email" autocomplete="email">
+        <div class="error"></div>
+      </div>
+      <div class="field" data-field="signin-password">
+        <label for="signinPassword" data-ar="كلمة المرور" data-en="Password">كلمة المرور</label>
+        <div class="password-wrap">
+          <input id="signinPassword" type="password" autocomplete="current-password">
+          <button class="toggle-password" type="button" onclick="togglePassword('signinPassword', this)" title="Show password">👁</button>
+        </div>
+        <div class="error"></div>
+      </div>
+      <div class="row">
+        <label class="remember"><input id="rememberMe" type="checkbox"> <span data-ar="تذكرني" data-en="Remember me">تذكرني</span></label>
+        <a class="link" href="forgot-password.html" data-ar="نسيت كلمة المرور؟" data-en="Forgot password?">نسيت كلمة المرور؟</a>
+      </div>
+      <button id="signInButton" class="primary-btn" type="submit" data-ar="تسجيل الدخول" data-en="Sign In">تسجيل الدخول</button>
+      <div class="divider"><span data-ar="أو" data-en="or">أو</span></div>
+      <button type="button" class="google-btn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        <span data-ar="تسجيل الدخول بـ Google" data-en="Sign in with Google">تسجيل الدخول بـ Google</span>
+      </button>
+    </form>
+
+    <form id="signUpForm" class="form" novalidate>
+      <div class="field" data-field="signup-name">
+        <label for="signupName" data-ar="الاسم الكامل" data-en="Full Name">الاسم الكامل</label>
+        <input id="signupName" type="text" autocomplete="name">
+        <div class="error"></div>
+      </div>
+      <div class="field" data-field="signup-email">
+        <label for="signupEmail" data-ar="البريد الإلكتروني" data-en="Email">البريد الإلكتروني</label>
+        <input id="signupEmail" type="email" autocomplete="email">
+        <div class="error"></div>
+      </div>
+      <div class="field" data-field="signup-password">
+        <label for="signupPassword" data-ar="كلمة المرور" data-en="Password">كلمة المرور</label>
+        <div class="password-wrap">
+          <input id="signupPassword" type="password" autocomplete="new-password">
+          <button class="toggle-password" type="button" onclick="togglePassword('signupPassword', this)" title="Show password">👁</button>
+        </div>
+        <div class="strength"><div id="strengthFill" class="strength-fill"></div></div>
+        <div id="strengthText" class="strength-text"></div>
+        <div class="error"></div>
+      </div>
+      <div class="field" data-field="signup-confirm">
+        <label for="signupConfirm" data-ar="تأكيد كلمة المرور" data-en="Confirm Password">تأكيد كلمة المرور</label>
+        <div class="password-wrap">
+          <input id="signupConfirm" type="password" autocomplete="new-password">
+          <button class="toggle-password" type="button" onclick="togglePassword('signupConfirm', this)" title="Show password">👁</button>
+        </div>
+        <div class="error"></div>
+      </div>
+      <button id="signUpButton" class="primary-btn" type="submit" data-ar="إنشاء حساب" data-en="Sign Up">إنشاء حساب</button>
+      <div class="divider"><span data-ar="أو" data-en="or">أو</span></div>
+      <button type="button" class="google-btn" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        <span data-ar="إنشاء حساب بـ Google" data-en="Sign up with Google">إنشاء حساب بـ Google</span>
+      </button>
+    </form>
+
+    <!-- Email Confirmation Screen — hidden by default -->
+    <div id="confirmScreen" style="display:none; flex-direction:column; align-items:center; text-align:center; padding:32px 8px; gap:18px;">
+      <div style="width:80px;height:80px;background:linear-gradient(135deg,#4a7c42,#2d5a27);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 24px rgba(74,124,66,0.35);animation:popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275) forwards;">✉️</div>
+      <h2 data-ar="تحقق من بريدك الإلكتروني!" data-en="Check your email!" style="font-size:1.3rem;font-weight:800;color:var(--text);">تحقق من بريدك الإلكتروني!</h2>
+      <p data-ar="أرسلنا رابط التأكيد إلى:" data-en="We sent a confirmation link to:" style="color:var(--text-muted);font-size:0.9rem;">أرسلنا رابط التأكيد إلى:</p>
+      <p id="confirmEmailDisplay" style="font-weight:700;color:var(--text);font-size:1rem;background:var(--surface-2);padding:8px 20px;border-radius:8px;word-break:break-all;"></p>
+      <div style="background:var(--surface-2);border-radius:12px;padding:16px 20px;width:100%;border:1px solid var(--border);text-align:right;">
+        <p style="font-size:0.82rem;color:var(--text-muted);line-height:2;margin:0;">
+          <span data-ar="١. افتح بريدك الإلكتروني" data-en="1. Open your email inbox">١. افتح بريدك الإلكتروني</span><br>
+          <span data-ar="٢. ابحث عن رسالة من Habit Tracker" data-en="2. Find the email from Habit Tracker">٢. ابحث عن رسالة من Habit Tracker</span><br>
+          <span data-ar="٣. انقر على رابط التأكيد" data-en="3. Click the confirmation link">٣. انقر على رابط التأكيد</span><br>
+          <span data-ar="٤. ستُحوَّل تلقائياً للتطبيق ✓" data-en="4. You'll be redirected to the app ✓">٤. ستُحوَّل تلقائياً للتطبيق ✓</span>
+        </p>
+      </div>
+      <button id="resendBtn" onclick="resendConfirmation()" style="background:transparent;border:1.5px solid #c4a87a;color:#c4a87a;padding:10px 24px;border-radius:8px;font-size:0.88rem;font-weight:700;width:100%;">
+        <span id="resendText" data-ar="إعادة إرسال الرابط" data-en="Resend confirmation link">إعادة إرسال الرابط</span>
+        <span id="resendCountdown" style="display:none;color:#999;"></span>
+      </button>
+      <a href="login.html" data-ar="← العودة لتسجيل الدخول" data-en="← Back to Sign In" style="color:#999;font-size:0.82rem;text-decoration:none;">← العودة لتسجيل الدخول</a>
+    </div>
+
+  </div>
+</main>
+
+<style>
+@keyframes popIn {
+  from { transform:scale(0.5); opacity:0; }
+  to   { transform:scale(1);   opacity:1; }
+}
+</style>
+
+<script>
+const SUPABASE_URL = "https://kkxunzwxjqljsoehridz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_LJ1P10kpXTEHPcXuECTTpg_0ALzHMDg";
+const { createClient } = supabase;
+const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let currentLang = localStorage.getItem('lang') || 'ar';
+// Builds an absolute redirect URL that preserves the current folder
+// (e.g. /devil/) instead of assuming the site lives at the domain root.
+function siteUrl(filename) {
+  const basePath = window.location.pathname.replace(/[^/]*$/, '');
+  return window.location.origin + basePath + filename;
+}
+
+const messages = {
+  ar: {
+    invalidEmail: 'أدخل بريدًا إلكترونيًا صحيحًا',
+    passwordShort: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+    nameShort: 'الاسم يجب أن يكون حرفين على الأقل',
+    confirmMismatch: 'كلمتا المرور غير متطابقتين',
+    required: 'هذا الحقل مطلوب',
+    signingIn: 'جاري تسجيل الدخول...',
+    creating: 'جاري إنشاء الحساب...',
+    signedIn: 'تم تسجيل الدخول بنجاح',
+    signedUp: 'تم إنشاء الحساب بنجاح',
+    weak: 'ضعيفة',
+    medium: 'متوسطة',
+    strong: 'قوية'
+  },
+  en: {
+    invalidEmail: 'Enter a valid email address',
+    passwordShort: 'Password must be at least 8 characters',
+    nameShort: 'Name must be at least 2 characters',
+    confirmMismatch: 'Passwords do not match',
+    required: 'This field is required',
+    signingIn: 'Signing in...',
+    creating: 'Creating account...',
+    signedIn: 'Signed in successfully',
+    signedUp: 'Account created successfully',
+    weak: 'Weak',
+    medium: 'Medium',
+    strong: 'Strong'
+  }
+};
+
+function t(key) { return messages[currentLang][key]; }
+
+async function signInWithGoogle() {
+  const buttons = document.querySelectorAll('.google-btn');
+  buttons.forEach(b => { b.disabled = true; b.style.opacity = '0.7'; });
+
+  const { error } = await _supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: siteUrl('index.html')
+    }
+  });
+
+  if (error) {
+    showToast(error.message, 'error');
+    buttons.forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+  }
+  // If no error: Supabase redirects automatically to Google login page
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  // Only change lang — never change dir on html (breaks layout)
+  document.documentElement.setAttribute('lang', lang);
+  document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+    const nodes = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE);
+    if (nodes.length > 0) {
+      nodes[0].textContent = el.getAttribute('data-' + lang);
+    } else {
+      el.textContent = el.getAttribute('data-' + lang);
+    }
+  });
+  document.getElementById('langToggle').textContent = lang === 'ar' ? 'EN English' : 'AR عربي';
+  updateStrength();
+}
+function toggleLanguage() { setLanguage(currentLang === 'ar' ? 'en' : 'ar'); }
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+function applyTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+}
+function switchTab(tab) {
+  document.getElementById('signInTab').classList.toggle('active', tab === 'signin');
+  document.getElementById('signUpTab').classList.toggle('active', tab === 'signup');
+  document.getElementById('signInForm').classList.toggle('active', tab === 'signin');
+  document.getElementById('signUpForm').classList.toggle('active', tab === 'signup');
+}
+function togglePassword(id, button) {
+  const input = document.getElementById(id);
+  input.type = input.type === 'password' ? 'text' : 'password';
+  button.textContent = input.type === 'password' ? '👁' : '🙈';
+}
+function showToast(message, type = 'info', duration = 4000) {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  toast.innerHTML = `<span style="font-size:1.2rem">${icon}</span><span>${message}</span>`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 350);
+  }, duration);
+}
+function setError(fieldName, message = '') {
+  const field = document.querySelector(`[data-field="${fieldName}"]`);
+  field.classList.toggle('invalid', Boolean(message));
+  field.querySelector('.error').textContent = message;
+}
+function validateSignIn() {
+  const email = document.getElementById('signinEmail').value.trim();
+  const password = document.getElementById('signinPassword').value;
+  setError('signin-email', emailRegex.test(email) ? '' : t('invalidEmail'));
+  setError('signin-password', password.length >= 8 ? '' : t('passwordShort'));
+  return emailRegex.test(email) && password.length >= 8;
+}
+function validateSignUp() {
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  const confirm = document.getElementById('signupConfirm').value;
+  setError('signup-name', name.length >= 2 ? '' : t('nameShort'));
+  setError('signup-email', emailRegex.test(email) ? '' : t('invalidEmail'));
+  setError('signup-password', password.length >= 8 ? '' : t('passwordShort'));
+  setError('signup-confirm', confirm === password && confirm.length > 0 ? '' : t('confirmMismatch'));
+  return name.length >= 2 && emailRegex.test(email) && password.length >= 8 && confirm === password;
+}
+function updateStrength() {
+  const value = document.getElementById('signupPassword').value;
+  const fill = document.getElementById('strengthFill');
+  const text = document.getElementById('strengthText');
+  if (!value) { fill.style.width = '0'; text.textContent = ''; return; }
+  let score = value.length >= 8 ? 1 : 0;
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+  if (/\d/.test(value) || /[^A-Za-z0-9]/.test(value)) score++;
+  const map = [
+    { width: '34%', color: '#a33030', label: t('weak') },
+    { width: '67%', color: '#e88a3a', label: t('medium') },
+    { width: '100%', color: '#4a7c42', label: t('strong') }
+  ][Math.min(Math.max(score - 1, 0), 2)];
+  fill.style.width = map.width;
+  fill.style.background = map.color;
+  text.textContent = map.label;
+}
+function setLoading(button, isLoading, key, defaultText) {
+  button.disabled = isLoading;
+  button.innerHTML = isLoading ? `<span class="spinner"></span><span>${t(key)}</span>` : defaultText;
+}
+document.getElementById('signInForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!validateSignIn()) return;
+  const button = document.getElementById('signInButton');
+  setLoading(button, true, 'signingIn', button.getAttribute(`data-${currentLang}`));
+  const email = document.getElementById('signinEmail').value.trim();
+  const password = document.getElementById('signinPassword').value;
+  const { error } = await _supabase.auth.signInWithPassword({ email, password });
+  setLoading(button, false, 'signingIn', button.getAttribute(`data-${currentLang}`));
+  if (error) { showToast(error.message, 'error'); return; }
+  showToast(t('signedIn'), 'success', 1200);
+  setTimeout(() => window.location.href = 'index.html', 700);
+});
+let resendEmail = '';
+let resendTimer = null;
+
+function showConfirmScreen(email) {
+  resendEmail = email;
+  document.getElementById('signUpForm').style.display = 'none';
+  document.querySelector('.tabs').style.display = 'none';
+  const screen = document.getElementById('confirmScreen');
+  screen.style.display = 'flex';
+  document.getElementById('confirmEmailDisplay').textContent = email;
+  startResendCountdown();
+}
+
+function startResendCountdown() {
+  const btn = document.getElementById('resendBtn');
+  const countdown = document.getElementById('resendCountdown');
+  const text = document.getElementById('resendText');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.style.cursor = 'not-allowed';
+  let secs = 60;
+  text.style.display = 'none';
+  countdown.style.display = 'inline';
+  countdown.textContent = currentLang === 'ar' ? 'إعادة الإرسال خلال ' + secs + ' ثانية' : 'Resend in ' + secs + 's';
+  resendTimer = setInterval(() => {
+    secs--;
+    countdown.textContent = currentLang === 'ar' ? 'إعادة الإرسال خلال ' + secs + ' ثانية' : 'Resend in ' + secs + 's';
+    if (secs <= 0) {
+      clearInterval(resendTimer);
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      text.style.display = 'inline';
+      countdown.style.display = 'none';
+    }
+  }, 1000);
+}
+
+async function resendConfirmation() {
+  const { error } = await _supabase.auth.resend({
+    type: 'signup',
+    email: resendEmail,
+    options: { emailRedirectTo: siteUrl('index.html') }
+  });
+  if (error) {
+    showToast(currentLang === 'ar' ? 'فشل الإرسال، حاول مجدداً' : 'Failed to resend, try again', 'error');
+  } else {
+    showToast(currentLang === 'ar' ? 'تم إعادة إرسال الرابط ✓' : 'Confirmation link resent ✓', 'success');
+    startResendCountdown();
+  }
+}
+
+document.getElementById('signUpForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!validateSignUp()) return;
+  const button = document.getElementById('signUpButton');
+  const origText = button.getAttribute('data-' + currentLang);
+  setLoading(button, true, 'creating', origText);
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  const { error } = await _supabase.auth.signUp({
+    email, password,
+    options: {
+      data: { full_name: name },
+      emailRedirectTo: siteUrl('index.html')
+    }
+  });
+  setLoading(button, false, 'creating', origText);
+  if (error) { showToast(error.message, 'error'); return; }
+  showConfirmScreen(email);
+});
+['signinEmail','signinPassword'].forEach(id => document.getElementById(id).addEventListener('blur', validateSignIn));
+['signupName','signupEmail','signupPassword','signupConfirm'].forEach(id => document.getElementById(id).addEventListener('blur', validateSignUp));
+document.getElementById('signupPassword').addEventListener('input', updateStrength);
+applyTheme();
+setLanguage(currentLang);
+</script>
+</body>
+</html>

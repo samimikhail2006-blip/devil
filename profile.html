@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — Habit Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+[data-theme="dark"] { --bg:#0f0f0f; --surface:#1c1c1c; --surface-2:#242424; --text:#f0ede6; --text-muted:#888; --border:#333; --shadow:0 2px 12px rgba(0,0,0,0.4); }
+[data-theme="light"] { --bg:#f0ede6; --surface:#ffffff; --surface-2:#f7f6f3; --text:#1a1a1a; --text-muted:#666; --border:#e0e0e0; --shadow:0 2px 12px rgba(0,0,0,0.06); }
+body {
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+.app-header {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 12px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.app-header h1 {
+  font-size: 1.3rem;
+  letter-spacing: 2px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e8d5b7, #c4a87a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nav-btn, .back-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  min-height: 32px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 700;
+}
+.nav-btn { width: 32px; padding: 0; display: grid; place-items: center; }
+.nav-btn:hover, .back-btn:hover { background: rgba(255,255,255,0.2); }
+.lang-btn {
+  background: rgba(196,168,122,0.2);
+  border: 1px solid rgba(196,168,122,0.4);
+  color: #c4a87a;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.profile-container { max-width: 960px; margin: 0 auto; padding: 24px 16px 96px; }
+.hero-card, .card {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.hero-card { text-align: center; margin-bottom: 16px; }
+.avatar {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c4a87a, #e8d5b7);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem; font-weight: 800; color: #1a1a1a;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  margin: 0 auto 16px;
+  background-size: cover;
+  background-position: center;
+}
+.avatar.has-image { color: transparent; }
+.profile-name { font-size: 1.7rem; font-weight: 800; }
+.profile-email, .member-since { color: var(--text-muted); margin-top: 4px; }
+.file-input { display: none; }
+.outline-btn {
+  margin-top: 16px;
+  border: 1px solid rgba(196,168,122,0.45);
+  background: rgba(196,168,122,0.14);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
+}
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.card h2 { font-size: 1rem; margin-bottom: 16px; }
+.field { margin-bottom: 14px; }
+label { display: block; font-weight: 700; margin-bottom: 7px; }
+input, textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+input { height: 42px; }
+textarea { min-height: 96px; resize: vertical; }
+input:focus, textarea:focus { border-color: #c4a87a; box-shadow: 0 0 0 3px rgba(196,168,122,0.16); }
+input[readonly] { opacity: 0.8; cursor: not-allowed; }
+.muted { color: var(--text-muted); font-size: 0.82rem; margin-top: 4px; }
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.settings-row:first-of-type { border-top: 0; padding-top: 0; }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.segmented button {
+  border: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  padding: 7px 12px;
+  font-weight: 700;
+}
+.segmented button.active { background: #1a1a1a; color: #c4a87a; }
+.password-panel {
+  display: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.password-panel.active { display: block; }
+.strength { height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; margin-top: 8px; }
+.strength-fill { height: 100%; width: 0; transition: width 0.2s, background 0.2s; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.summary-card {
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #c4a87a, #e8d5b7);
+}
+.stat-value { font-size: 2rem; font-weight: 800; }
+.stat-label { color: var(--text-muted); font-weight: 700; }
+.danger-card {
+  border: 1px solid #a33030;
+  background: color-mix(in srgb, var(--surface) 92%, #a33030);
+  border-radius: 12px;
+  padding: 16px;
+}
+.danger-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.dark-btn, .delete-btn, .primary-btn {
+  min-height: 42px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.dark-btn { background: #1a1a1a; color: #fff; }
+.delete-btn { background: #a33030; color: #fff; }
+.delete-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.primary-btn {
+  background: linear-gradient(135deg, #c4a87a, #a8885a);
+  color: #1a1a1a;
+}
+.save-bar {
+  max-width: 960px;
+  margin: 16px auto 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.spinner {
+  width: 16px; height: 16px; border: 2px solid rgba(26,26,26,0.25);
+  border-top-color: #1a1a1a; border-radius: 50%; animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  min-width: 280px;
+  max-width: 360px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 9999;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-right: 4px solid #4a7c42; }
+.toast.error { border-right: 4px solid #a33030; }
+.toast.info { border-right: 4px solid #c4a87a; }
+[dir="ltr"] .toast { left: auto; right: 24px; }
+[dir="ltr"] .toast.success, [dir="ltr"] .toast.error, [dir="ltr"] .toast.info { border-right: 0; border-left: 4px solid; }
+[dir="ltr"] .toast.success { border-left-color: #4a7c42; }
+[dir="ltr"] .toast.error { border-left-color: #a33030; }
+[dir="ltr"] .toast.info { border-left-color: #c4a87a; }
+@media (max-width: 768px) {
+  .app-header { padding: 10px 14px; align-items: flex-start; }
+  .app-header h1 { font-size: 1.05rem; }
+  .profile-grid, .stats-grid { grid-template-columns: 1fr; }
+  .profile-container { padding-bottom: 112px; }
+  .save-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 16px; background: var(--surface);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    z-index: 100;
+    margin: 0;
+    max-width: none;
+  }
+  .save-bar .primary-btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <h1>HABIT TRACKER</h1>
+  <div class="header-controls">
+    <button class="back-btn" onclick="window.location.href='index.html'" data-ar="← العودة للتطبيق" data-en="← Back to App">← العودة للتطبيق</button>
+    <button id="langToggle" class="lang-btn" onclick="toggleLanguage()">EN English</button>
+    <button id="themeIcon" class="nav-btn" onclick="toggleTheme()" title="Theme">🌙</button>
+  </div>
+</header>
+
+<main class="profile-container">
+  <section class="hero-card">
+    <div id="avatar" class="avatar">؟</div>
+    <h2 id="heroName" class="profile-name">...</h2>
+    <div id="heroEmail" class="profile-email">...</div>
+    <div class="member-since"><span data-ar="عضو منذ:" data-en="Member since:">عضو منذ:</span> <span id="memberSince">...</span></div>
+    <input id="photoInput" class="file-input" type="file" accept="image/*">
+    <button class="outline-btn" onclick="document.getElementById('photoInput').click()" data-ar="تعديل الصورة" data-en="Change Photo">تعديل الصورة</button>
+  </section>
+
+  <div class="profile-grid">
+    <section class="card">
+      <h2 data-ar="المعلومات الشخصية" data-en="Personal Information">المعلومات الشخصية</h2>
+      <div class="field">
+        <label for="fullName" data-ar="الاسم الكامل" data-en="Full Name">الاسم الكامل</label>
+        <input id="fullName" type="text" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="displayName" data-ar="اسم العرض" data-en="Display Name">اسم العرض</label>
+        <input id="displayName" type="text">
+      </div>
+      <div class="field">
+        <label for="bio" data-ar="نبذة شخصية" data-en="Bio">نبذة شخصية</label>
+        <textarea id="bio" maxlength="200"></textarea>
+        <div class="muted"><span id="bioCount">0</span> / 200</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 data-ar="إعدادات الحساب" data-en="Account Settings">إعدادات الحساب</h2>
+      <div class="field">
+        <label for="email" data-ar="البريد الإلكتروني 🔒" data-en="Email 🔒">البريد الإلكتروني 🔒</label>
+        <input id="email" type="email" readonly>
+      </div>
+      <button class="outline-btn" type="button" onclick="togglePasswordPanel()" data-ar="تغيير كلمة المرور" data-en="Change Password">تغيير كلمة المرور</button>
+      <div id="passwordPanel" class="password-panel">
+        <div class="field">
+          <label for="currentPassword" data-ar="كلمة المرور الحالية" data-en="Current Password">كلمة المرور الحالية</label>
+          <input id="currentPassword" type="password" autocomplete="current-password">
+          <div class="muted" data-ar="للتأكيد المحلي فقط. Supabase سيحدث كلمة المرور للجلسة الحالية." data-en="For local confirmation only. Supabase updates the current session password.">للتأكيد المحلي فقط. Supabase سيحدث كلمة المرور للجلسة الحالية.</div>
+        </div>
+        <div class="field">
+          <label for="newPassword" data-ar="كلمة المرور الجديدة" data-en="New Password">كلمة المرور الجديدة</label>
+          <input id="newPassword" type="password" autocomplete="new-password">
+          <div class="strength"><div id="strengthFill" class="strength-fill"></div></div>
+          <div id="strengthText" class="muted"></div>
+        </div>
+        <div class="field">
+          <label for="confirmPassword" data-ar="تأكيد كلمة المرور الجديدة" data-en="Confirm New Password">تأكيد كلمة المرور الجديدة</label>
+          <input id="confirmPassword" type="password" autocomplete="new-password">
+        </div>
+        <button class="primary-btn" type="button" onclick="changePassword()" data-ar="حفظ كلمة المرور" data-en="Save Password">حفظ كلمة المرور</button>
+      </div>
+      <div class="settings-row">
+        <span data-ar="تفضيل اللغة" data-en="Language preference">تفضيل اللغة</span>
+        <div class="segmented">
+          <button id="prefAr" type="button" onclick="setLanguage('ar')">Arabic</button>
+          <button id="prefEn" type="button" onclick="setLanguage('en')">English</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span data-ar="تفضيل المظهر" data-en="Theme preference">تفضيل المظهر</span>
+        <div class="segmented">
+          <button id="prefLight" type="button" onclick="setTheme('light')" data-ar="فاتح" data-en="Light">فاتح</button>
+          <button id="prefDark" type="button" onclick="setTheme('dark')" data-ar="داكن" data-en="Dark">داكن</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 data-ar="إحصائياتك" data-en="Your Stats">إحصائياتك</h2>
+      <div class="stats-grid">
+        <div class="summary-card">
+          <div id="habitsTracked" class="stat-value">0</div>
+          <div class="stat-label" data-ar="إجمالي العادات" data-en="Total habits tracked">إجمالي العادات</div>
+        </div>
+        <div class="summary-card">
+          <div id="daysActive" class="stat-value">0</div>
+          <div class="stat-label" data-ar="أيام النشاط" data-en="Days active">أيام النشاط</div>
+        </div>
+        <div class="summary-card">
+          <div id="bestStreak" class="stat-value">0</div>
+          <div class="stat-label" data-ar="أفضل سلسلة" data-en="Best streak">أفضل سلسلة</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 data-ar="منطقة الخطر" data-en="Danger Zone">منطقة الخطر</h2>
+      <div class="danger-card">
+        <p class="muted" data-ar="تسجيل الخروج آمن وفوري. حذف الحساب يتطلب تأكيدًا صريحًا." data-en="Signing out is immediate. Account deletion requires explicit confirmation.">تسجيل الخروج آمن وفوري. حذف الحساب يتطلب تأكيدًا صريحًا.</p>
+        <div class="danger-actions">
+          <button class="dark-btn" type="button" onclick="signOut()" data-ar="تسجيل الخروج" data-en="Sign Out">تسجيل الخروج</button>
+          <button id="deleteButton" class="delete-btn" type="button" onclick="requestDelete()" disabled data-ar="حذف الحساب" data-en="Delete Account">حذف الحساب</button>
+        </div>
+        <div class="field" style="margin-top:14px;margin-bottom:0">
+          <label for="deleteConfirm" data-ar='اكتب "احذف" للتأكيد' data-en='Type "DELETE" to confirm'>اكتب "احذف" للتأكيد</label>
+          <input id="deleteConfirm" type="text">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="save-bar">
+    <button id="saveButton" class="primary-btn" type="button" onclick="saveProfile()" data-ar="حفظ التغييرات" data-en="Save Changes">حفظ التغييرات</button>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://kkxunzwxjqljsoehridz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_LJ1P10kpXTEHPcXuECTTpg_0ALzHMDg";
+const { createClient } = supabase;
+const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentLang = localStorage.getItem('lang') || 'ar';
+let sessionUser = null;
+let avatarData = '';
+
+(async () => {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) window.location.replace('login.html');
+  sessionUser = session.user;
+})();
+
+const messages = {
+  ar: {
+    saved:'تم حفظ التغييرات', passwordSaved:'تم تحديث كلمة المرور', passwordShort:'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+    mismatch:'كلمتا المرور غير متطابقتين', weak:'ضعيفة', medium:'متوسطة', strong:'قوية',
+    deleteMarked:'تم تسجيل طلب حذف الحساب. يحتاج الحذف النهائي إلى دالة خادم في Supabase.',
+    saving:'جاري الحفظ...'
+  },
+  en: {
+    saved:'Changes saved', passwordSaved:'Password updated', passwordShort:'Password must be at least 8 characters',
+    mismatch:'Passwords do not match', weak:'Weak', medium:'Medium', strong:'Strong',
+    deleteMarked:'Account deletion request recorded. Final deletion needs a Supabase server function.',
+    saving:'Saving...'
+  }
+};
+function t(key) { return messages[currentLang][key]; }
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lang', lang);
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.querySelectorAll('[data-ar]').forEach(el => { el.textContent = el.getAttribute(`data-${lang}`); });
+  document.getElementById('langToggle').textContent = lang === 'ar' ? 'EN English' : 'AR عربي';
+  document.getElementById('prefAr').classList.toggle('active', lang === 'ar');
+  document.getElementById('prefEn').classList.toggle('active', lang === 'en');
+  updateStrength();
+}
+function toggleLanguage() { setLanguage(currentLang === 'ar' ? 'en' : 'ar'); }
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  document.getElementById('themeIcon').textContent = theme === 'dark' ? '☀️' : '🌙';
+  document.getElementById('prefLight').classList.toggle('active', theme === 'light');
+  document.getElementById('prefDark').classList.toggle('active', theme === 'dark');
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  setTheme(current === 'dark' ? 'light' : 'dark');
+}
+function showToast(message, type = 'info', duration = 4000) {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  toast.innerHTML = `<span style="font-size:1.2rem">${icon}</span><span>${message}</span>`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 350); }, duration);
+}
+function initials(name, email) {
+  const source = (name || email || '?').trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+function formatMemberSince(dateValue) {
+  const date = new Date(dateValue || Date.now());
+  return date.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', year: 'numeric' });
+}
+function updateHero() {
+  const name = document.getElementById('fullName').value.trim() || document.getElementById('displayName').value.trim() || sessionUser?.email || '';
+  const email = sessionUser?.email || '';
+  document.getElementById('heroName').textContent = name;
+  document.getElementById('heroEmail').textContent = email;
+  document.getElementById('memberSince').textContent = formatMemberSince(sessionUser?.created_at);
+  const avatar = document.getElementById('avatar');
+  const image = avatarData || sessionUser?.user_metadata?.avatar_url || '';
+  avatar.classList.toggle('has-image', Boolean(image));
+  avatar.style.backgroundImage = image ? `url("${image}")` : '';
+  avatar.textContent = image ? '' : initials(name, email);
+}
+function fallbackStats() {
+  try {
+    const raw = localStorage.getItem('habitTrackerData');
+    const data = raw ? JSON.parse(raw) : {};
+    const monthly = data.monthlyHabits || [];
+    const daily = data.dailyHabits || [];
+    const quit = data.quitHabits || [];
+    const activeDays = new Set();
+    let bestStreak = 0;
+    daily.forEach(h => Object.keys(h.completions || {}).forEach(day => h.completions[day] && activeDays.add(day)));
+    quit.forEach(h => {
+      let streak = 0;
+      Object.keys(h.days || {}).sort().forEach(day => {
+        if (h.days[day] === 'held') { streak += 1; activeDays.add(day); bestStreak = Math.max(bestStreak, streak); }
+        else if (h.days[day] === 'relapsed') streak = 0;
+      });
+    });
+    monthly.forEach(h => Object.keys(h.completions || {}).forEach(key => h.completions[key] > 0 && activeDays.add(key)));
+    return { habitsTracked: monthly.length + daily.length + quit.length, daysActive: activeDays.size, bestStreak };
+  } catch (error) {
+    return { habitsTracked: 0, daysActive: 0, bestStreak: 0 };
+  }
+}
+async function loadStats() {
+  const fallback = fallbackStats();
+  if (!sessionUser) return fallback;
+  const { data } = await _supabase.from('profiles').select('stats').eq('id', sessionUser.id).single();
+  return data?.stats || fallback;
+}
+function renderStats(stats) {
+  document.getElementById('habitsTracked').textContent = stats.habitsTracked || 0;
+  document.getElementById('daysActive').textContent = stats.daysActive || 0;
+  document.getElementById('bestStreak').textContent = stats.bestStreak || 0;
+}
+function togglePasswordPanel() {
+  document.getElementById('passwordPanel').classList.toggle('active');
+}
+function updateStrength() {
+  const value = document.getElementById('newPassword').value;
+  const fill = document.getElementById('strengthFill');
+  const text = document.getElementById('strengthText');
+  if (!value) { fill.style.width = '0'; text.textContent = ''; return; }
+  let score = value.length >= 8 ? 1 : 0;
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+  if (/\d/.test(value) || /[^A-Za-z0-9]/.test(value)) score++;
+  const map = [
+    { width: '34%', color: '#a33030', label: t('weak') },
+    { width: '67%', color: '#e88a3a', label: t('medium') },
+    { width: '100%', color: '#4a7c42', label: t('strong') }
+  ][Math.min(Math.max(score - 1, 0), 2)];
+  fill.style.width = map.width;
+  fill.style.background = map.color;
+  text.textContent = map.label;
+}
+async function changePassword() {
+  const password = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
+  if (password.length < 8) { showToast(t('passwordShort'), 'error'); return; }
+  if (password !== confirm) { showToast(t('mismatch'), 'error'); return; }
+  const { error } = await _supabase.auth.updateUser({ password });
+  if (error) { showToast(error.message, 'error'); return; }
+  document.getElementById('currentPassword').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
+  updateStrength();
+  showToast(t('passwordSaved'), 'success');
+}
+async function saveProfile() {
+  const button = document.getElementById('saveButton');
+  const original = button.getAttribute(`data-${currentLang}`);
+  button.disabled = true;
+  button.innerHTML = `<span class="spinner"></span><span>${t('saving')}</span>`;
+  const fullName = document.getElementById('fullName').value.trim();
+  const displayName = document.getElementById('displayName').value.trim();
+  const bio = document.getElementById('bio').value.trim();
+  const metadata = { full_name: fullName, display_name: displayName, bio };
+  if (avatarData) metadata.avatar_url = avatarData;
+  const { data, error } = await _supabase.auth.updateUser({ data: metadata });
+  button.disabled = false;
+  button.textContent = original;
+  if (error) { showToast(error.message, 'error'); return; }
+  sessionUser = data.user;
+  updateHero();
+  showToast(t('saved'), 'success');
+}
+async function signOut() {
+  await _supabase.auth.signOut();
+  window.location.replace('login.html');
+}
+async function requestDelete() {
+  const { error } = await _supabase.auth.updateUser({ data: { deletion_requested: true, deletion_requested_at: new Date().toISOString() } });
+  if (error) { showToast(error.message, 'error'); return; }
+  showToast(t('deleteMarked'), 'info', 6000);
+}
+async function initProfile() {
+  while (!sessionUser) await new Promise(resolve => setTimeout(resolve, 25));
+  const meta = sessionUser.user_metadata || {};
+  document.getElementById('fullName').value = meta.full_name || '';
+  document.getElementById('displayName').value = meta.display_name || '';
+  document.getElementById('bio').value = meta.bio || '';
+  document.getElementById('email').value = sessionUser.email || '';
+  avatarData = meta.avatar_url || '';
+  document.getElementById('bioCount').textContent = document.getElementById('bio').value.length;
+  updateHero();
+  renderStats(await loadStats());
+}
+document.getElementById('bio').addEventListener('input', e => document.getElementById('bioCount').textContent = e.target.value.length);
+document.getElementById('fullName').addEventListener('input', updateHero);
+document.getElementById('displayName').addEventListener('input', updateHero);
+document.getElementById('newPassword').addEventListener('input', updateStrength);
+document.getElementById('deleteConfirm').addEventListener('input', e => {
+  const value = e.target.value.trim();
+  document.getElementById('deleteButton').disabled = !(value === 'DELETE' || value === 'احذف');
+});
+document.getElementById('photoInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { avatarData = reader.result; updateHero(); };
+  reader.readAsDataURL(file);
+});
+setTheme(localStorage.getItem('theme') || 'light');
+setLanguage(currentLang);
+initProfile();
+</script>
+</body>
+</html>
